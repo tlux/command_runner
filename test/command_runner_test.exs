@@ -4,8 +4,6 @@ defmodule CommandRunnerTest do
   import CommandRunner.OSProcessHelper
   import Liveness
 
-  alias Capitano.Utils.CommandRunner
-
   setup do
     {:ok, server: start_supervised!(CommandRunner)}
   end
@@ -18,7 +16,12 @@ defmodule CommandRunnerTest do
 
       task_a =
         Task.Supervisor.async(task_supervisor, fn ->
-          CommandRunner.run_command(server, "sleep 2", [], production_command_ref)
+          CommandRunner.run_command(
+            server,
+            "sleep 2",
+            [],
+            production_command_ref
+          )
         end)
 
       task_b =
@@ -53,7 +56,12 @@ defmodule CommandRunnerTest do
 
       task_a =
         Task.Supervisor.async(task_supervisor, fn ->
-          CommandRunner.run_command(server, "sleep 2", [], production_command_ref)
+          CommandRunner.run_command(
+            server,
+            "sleep 2",
+            [],
+            production_command_ref
+          )
         end)
 
       task_b =
@@ -82,7 +90,10 @@ defmodule CommandRunnerTest do
 
   describe "run_command/2" do
     test "successful command", %{server: server} do
-      assert CommandRunner.run_command(server, "./test/fixtures/success_script.sh") ==
+      assert CommandRunner.run_command(
+               server,
+               "./test/fixtures/success_script.sh"
+             ) ==
                {0, "Everything OK!\n"}
     end
 
@@ -101,7 +112,7 @@ defmodule CommandRunnerTest do
       end)
 
       assert eventually(fn ->
-               CommandRunner
+               server
                |> :sys.get_state()
                |> Map.fetch!(:commands)
                |> Map.keys()
@@ -135,7 +146,7 @@ defmodule CommandRunnerTest do
     end
   end
 
-  describe "run_command/2" do
+  describe "run_command/3" do
     test "change working dir", %{server: server} do
       assert CommandRunner.run_command(server, "./success_script.sh",
                cd: "test/fixtures"
@@ -144,26 +155,34 @@ defmodule CommandRunnerTest do
 
     test "use env vars", %{server: server} do
       File.cd!("test/fixtures", fn ->
-        assert CommandRunner.run_command(server, "./success_script_with_env_vars.sh",
+        assert CommandRunner.run_command(
+                 server,
+                 "./success_script_with_env_vars.sh",
                  env: [{"FOO", "Tobi"}]
                ) == {0, "Hello, Tobi!\n"}
 
-        assert CommandRunner.run_command(server, "./success_script_with_env_vars.sh",
+        assert CommandRunner.run_command(
+                 server,
+                 "./success_script_with_env_vars.sh",
                  env: [{"FOO", 123}]
                ) == {0, "Hello, 123!\n"}
 
-        assert CommandRunner.run_command(server, "./success_script_with_env_vars.sh",
+        assert CommandRunner.run_command(
+                 server,
+                 "./success_script_with_env_vars.sh",
                  env: %{"FOO" => "Fernando"}
                ) == {0, "Hello, Fernando!\n"}
 
-        assert CommandRunner.run_command(server, "./success_script_with_env_vars.sh",
+        assert CommandRunner.run_command(
+                 server,
+                 "./success_script_with_env_vars.sh",
                  env: %{"FOO" => nil}
                ) == {0, "Hello, !\n"}
       end)
     end
   end
 
-  describe "run_command/3" do
+  describe "run_command/4" do
     test "prevent parallel execution for same ref", %{server: server} do
       task_supervisor = start_supervised!(Task.Supervisor)
       command_ref = make_ref()
@@ -188,7 +207,7 @@ defmodule CommandRunnerTest do
     end
   end
 
-  describe "command_running?/1" do
+  describe "command_running?/2" do
     test "true when command running for env", %{server: server} do
       task_supervisor = start_supervised!(Task.Supervisor)
       command_ref = make_ref()
@@ -207,7 +226,7 @@ defmodule CommandRunnerTest do
     end
   end
 
-  describe "os_pid/1" do
+  describe "os_pid/2" do
     test "get OS process ID when command running for env", %{server: server} do
       task_supervisor = start_supervised!(Task.Supervisor)
       command_ref = make_ref()
@@ -235,7 +254,7 @@ defmodule CommandRunnerTest do
     end
   end
 
-  describe "stop_command/1" do
+  describe "stop_command/2" do
     test "kill running command", %{server: server} do
       task_supervisor = start_supervised!(Task.Supervisor)
       command_ref = make_ref()
