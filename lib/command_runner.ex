@@ -1,18 +1,34 @@
 defmodule CommandRunner do
+  @moduledoc """
+  A server to run shell commands.
+  """
+
   use GenServer
 
+  @typedoc """
+  Type describing the command runner server.
+  """
   @type server :: GenServer.server()
 
+  @doc """
+  Starts a command runner.
+  """
   @spec start_link(Keyword.t()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, :ok, opts)
   end
 
+  @doc """
+  Stops the given command runner and terminates all running commands.
+  """
   @spec stop(server, term) :: :ok
   def stop(server, reason \\ :normal) do
     GenServer.stop(server, reason)
   end
 
+  @doc """
+  Runs a particular command and returns the exit code and result data.
+  """
   @spec run_command(server, binary, Keyword.t(), reference) ::
           {exit_code :: integer, binary} | :locked | :stopped
   def run_command(
@@ -28,16 +44,28 @@ defmodule CommandRunner do
     )
   end
 
+  @doc """
+  Determines whether the command with the specified ref is running on the given
+  server.
+  """
   @spec command_running?(server, reference) :: boolean
   def command_running?(server, command_ref) do
     GenServer.call(server, {:command_running?, command_ref})
   end
 
+  @doc """
+  Gets the OS process ID for the command with the specified ref on the given
+  server.
+  """
   @spec os_pid(server, reference) :: nil | non_neg_integer
   def os_pid(server, command_ref) do
     GenServer.call(server, {:os_pid, command_ref})
   end
 
+  @doc """
+  Stops the command with the given ref and brutally kills the associated OS
+  process.
+  """
   @spec stop_command(server, reference) :: :ok
   def stop_command(server, command_ref) do
     GenServer.call(server, {:stop_command, command_ref})
@@ -122,16 +150,12 @@ defmodule CommandRunner do
 
   defp open_opts(opts) do
     for opt <- opts do
-      case opt do
-        {:env, env} ->
-          {:env,
-           Enum.into(env, [], fn
-             {key, nil} -> {to_charlist(key), false}
-             {key, value} -> {to_charlist(key), to_charlist(value)}
-           end)}
-
-        opt ->
-          opt
+      with {:env, env} <- opt do
+        {:env,
+         Enum.into(env, [], fn
+           {key, nil} -> {to_charlist(key), false}
+           {key, value} -> {to_charlist(key), to_charlist(value)}
+         end)}
       end
     end
   end

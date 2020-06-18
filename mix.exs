@@ -22,7 +22,7 @@ defmodule CommandRunner.MixProject do
     [
       {:credo, "~> 1.3", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.22", only: :dev, runtime: false},
       {:excoveralls, "~> 0.12", only: :test},
       {:liveness, "~> 1.0", only: :test}
     ]

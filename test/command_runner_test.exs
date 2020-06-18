@@ -93,8 +93,7 @@ defmodule CommandRunnerTest do
       assert CommandRunner.run_command(
                server,
                "./test/fixtures/success_script.sh"
-             ) ==
-               {0, "Everything OK!\n"}
+             ) == {0, "Everything OK!\n"}
     end
 
     test "successful command with working dir", %{server: server} do
