@@ -8,7 +8,26 @@ defmodule CommandRunner.MixProject do
       elixir: "~> 1.8",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.travis": :test
+      ],
+      dialyzer: [plt_add_apps: [:ex_unit, :mix]],
+      description: description(),
+      package: package(),
+
+      # Docs
+      name: "CommandRunner",
+      source_url: "http://github.com/tlux/command_runner",
+      docs: [
+        main: "readme",
+        extras: ["README.md"]
+      ]
     ]
   end
 
@@ -28,6 +47,19 @@ defmodule CommandRunner.MixProject do
     ]
   end
 
+  defp description do
+    "An Elixir library providing a simple API to start and stop shell commands."
+  end
+
   defp elixirc_paths(:test), do: ["test/support", "lib"]
   defp elixirc_paths(_env), do: ["lib"]
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => "https://github.com/tlux/command_runner"
+      }
+    ]
+  end
 end

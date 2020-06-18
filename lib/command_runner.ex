@@ -1,6 +1,26 @@
 defmodule CommandRunner do
   @moduledoc """
-  A server to run shell commands.
+  A server to run Unix shell commands.
+
+  ## Setup
+
+  The recommended way is to use `CommandRunner` as part of your supervision
+  tree.
+
+      defmodule MyApp.Application do
+        use Application
+
+        # ...
+
+        @impl true
+        def init(:ok) do
+          children = [
+            {CommandRunner, name: MyApp.CommandRunner}
+          ]
+
+          Supervisor.init(children, strategy: :one_for_one)
+        end
+      end
   """
 
   use GenServer
@@ -28,6 +48,33 @@ defmodule CommandRunner do
 
   @doc """
   Runs a particular command and returns the exit code and result data.
+
+  ## Examples
+
+      iex> CommandRunner.run_command(MyApp.Runner, "echo 'Hello World'")
+      {0, "Hello World\\n"}
+
+      iex> CommandRunner.run_command(MyApp.Runner, "which foo")
+      {1, ""}
+
+  Only one command with the same ref can run in a single command runner process.
+
+      iex> ref = make_ref()
+      ...> Task.async(fn ->
+      ...>   CommandRunner.run_command(MyApp.Runner, "sleep 2", [], ref)
+      ...> end)
+      ...> CommandRunner.run_command(MyApp.Runner, "echo 'Hello'", [], ref)
+      :locked
+
+  Other processes may stop a command. The caller is notified about that.
+
+      iex> ref = make_ref()
+      ...> task = Task.async(fn ->
+      ...>   CommandRunner.run_command(MyApp.Runner, "sleep 2", [], ref)
+      ...> end)
+      ...> CommandRunner.stop_command(MyApp.Runner, ref)
+      ...> Task.await(task)
+      :stopped
   """
   @spec run_command(server, binary, Keyword.t(), reference) ::
           {exit_code :: integer, binary} | :locked | :stopped
@@ -47,6 +94,19 @@ defmodule CommandRunner do
   @doc """
   Determines whether the command with the specified ref is running on the given
   server.
+
+  ## Examples
+
+      iex> ref = make_ref()
+      ...> Task.async(fn ->
+      ...>   CommandRunner.run_command(MyApp.Runner, "sleep 2", [], ref)
+      ...> end)
+      ...> CommandRunner.command_running?(MyApp.Runner, ref)
+      true
+
+      iex> CommandRunner.run_command(MyApp.Runner, "echo 'Hey!'", [], ref)
+      ...> CommandRunner.command_running?(MyApp.Runner, ref)
+      false
   """
   @spec command_running?(server, reference) :: boolean
   def command_running?(server, command_ref) do
@@ -56,6 +116,18 @@ defmodule CommandRunner do
   @doc """
   Gets the OS process ID for the command with the specified ref on the given
   server.
+
+  ## Examples
+
+      iex> ref = make_ref()
+      ...> Task.async(fn ->
+      ...>   CommandRunner.run_command(MyApp.Runner, "sleep 2", [], ref)
+      ...> end)
+      ...> CommandRunner.os_pid(MyApp.Runner, ref)
+      6458
+
+      iex> CommandRunner.run_command(MyApp.Runner, "echo 'Hey!'", [], ref)
+      nil
   """
   @spec os_pid(server, reference) :: nil | non_neg_integer
   def os_pid(server, command_ref) do
@@ -65,6 +137,15 @@ defmodule CommandRunner do
   @doc """
   Stops the command with the given ref and brutally kills the associated OS
   process.
+
+  # Example
+
+      iex> ref = make_ref()
+      ...> Task.async(fn ->
+      ...>   CommandRunner.run_command(MyApp.Runner, "sleep 2", [], ref)
+      ...> end)
+      ...> CommandRunner.stop_command(MyApp.Runner, ref)
+      :ok
   """
   @spec stop_command(server, reference) :: :ok
   def stop_command(server, command_ref) do
@@ -74,7 +155,7 @@ defmodule CommandRunner do
   # Callbacks
 
   @impl true
-  def init(:ok) do
+  def init(_init_arg) do
     {:ok, %{commands: %{}, ports: %{}}}
   end
 

@@ -1,6 +1,6 @@
 # CommandRunner
 
-**TODO: Add description**
+An Elixir library providing a simple API to start and stop shell commands.
 
 ## Installation
 
@@ -10,12 +10,12 @@ by adding `command_runner` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:command_runner, "~> 0.1.0"}
+    {:command_runner, "~> 0.1"}
   ]
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/command_runner](https://hexdocs.pm/command_runner).
-
+Documentation can be generated with
+[ExDoc](https://github.com/elixir-lang/ex_doc) and published on
+[HexDocs](https://hexdocs.pm). Once published, the docs can be found at
+[https://hexdocs.pm/command_runner](https://hexdocs.pm/command_runner).
