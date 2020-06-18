@@ -1,5 +1,9 @@
 # CommandRunner
 
+[![Build Status](https://travis-ci.org/tlux/command_runner.svg?branch=master)](https://travis-ci.org/tlux/command_runner)
+[![Coverage Status](https://coveralls.io/repos/github/tlux/command_runner/badge.svg?branch=master)](https://coveralls.io/github/tlux/command_runner?branch=master)
+[![Hex.pm](https://img.shields.io/hexpm/v/command_runner.svg)](https://hex.pm/packages/command_runner)
+
 An Elixir library providing a simple API to start and stop shell commands.
 
 ## Installation
