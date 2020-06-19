@@ -7,7 +7,7 @@ defmodule CommandRunner.State do
 
   @type port_entry :: %{
           client: GenServer.from(),
-          command_ref: reference,
+          ref: reference,
           result:
             {term, (term, Collectable.command() -> Collectable.t() | term)}
         }
@@ -30,7 +30,7 @@ defmodule CommandRunner.State do
         ports:
           Map.put(state.ports, port, %{
             client: client,
-            command_ref: ref,
+            ref: ref,
             result: Collectable.into("")
           })
     }
@@ -53,5 +53,10 @@ defmodule CommandRunner.State do
       | refs: Map.delete(state.refs, ref),
         ports: Map.delete(state.ports, port)
     }
+  end
+
+  @spec put_result(t, port, {term, function}) :: t
+  def put_result(%__MODULE__{} = state, port, result) do
+    %{state | ports: put_in(state.ports, [port, :result], result)}
   end
 end

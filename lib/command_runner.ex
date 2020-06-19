@@ -74,7 +74,7 @@ defmodule CommandRunner do
       ...>   CommandRunner.run_command(MyApp.Runner, "sleep 2", [], ref)
       ...> end)
       ...> CommandRunner.run_command(MyApp.Runner, "echo 'Hello'", [], ref)
-      :locked
+      :running
 
   Other processes may stop a command. The caller is notified about that.
 
@@ -87,16 +87,16 @@ defmodule CommandRunner do
       :stopped
   """
   @spec run_command(server, binary, Keyword.t(), reference) ::
-          {exit_code :: integer, binary} | :locked | :stopped
+          {exit_code :: integer, binary} | :running | :stopped
   def run_command(
         server,
         cmd,
         opts \\ [],
-        command_ref \\ make_ref()
+        ref \\ make_ref()
       ) do
     GenServer.call(
       server,
-      {:run_command, cmd, opts, command_ref},
+      {:run_command, cmd, opts, ref},
       :infinity
     )
   end
@@ -119,8 +119,8 @@ defmodule CommandRunner do
       false
   """
   @spec command_running?(server, reference) :: boolean
-  def command_running?(server, command_ref) do
-    GenServer.call(server, {:command_running?, command_ref})
+  def command_running?(server, ref) do
+    GenServer.call(server, {:command_running?, ref})
   end
 
   @doc """
@@ -140,8 +140,8 @@ defmodule CommandRunner do
       nil
   """
   @spec os_pid(server, reference) :: nil | non_neg_integer
-  def os_pid(server, command_ref) do
-    GenServer.call(server, {:os_pid, command_ref})
+  def os_pid(server, ref) do
+    GenServer.call(server, {:os_pid, ref})
   end
 
   @doc """
@@ -158,8 +158,8 @@ defmodule CommandRunner do
       :ok
   """
   @spec stop_command(server, reference) :: :ok
-  def stop_command(server, command_ref) do
-    GenServer.call(server, {:stop_command, command_ref})
+  def stop_command(server, ref) do
+    GenServer.call(server, {:stop_command, ref})
   end
 
   # Callbacks
@@ -179,12 +179,12 @@ defmodule CommandRunner do
 
   @impl true
   def handle_call(
-        {:run_command, cmd, opts, command_ref},
+        {:run_command, cmd, opts, ref},
         from,
         state
       ) do
-    if State.entry_exists?(state, command_ref) do
-      {:reply, :locked, state}
+    if State.entry_exists?(state, ref) do
+      {:reply, :running, state}
     else
       port =
         Port.open({:spawn, cmd}, [
@@ -193,16 +193,16 @@ defmodule CommandRunner do
           :stderr_to_stdout | open_opts(opts)
         ])
 
-      {:noreply, State.put_entry(state, command_ref, port, from)}
+      {:noreply, State.put_entry(state, ref, port, from)}
     end
   end
 
-  def handle_call({:command_running?, command_ref}, _from, state) do
-    {:reply, State.entry_exists?(state, command_ref), state}
+  def handle_call({:command_running?, ref}, _from, state) do
+    {:reply, State.entry_exists?(state, ref), state}
   end
 
-  def handle_call({:os_pid, command_ref}, _from, state) do
-    case State.fetch_entry_by_ref(state, command_ref) do
+  def handle_call({:os_pid, ref}, _from, state) do
+    case State.fetch_entry_by_ref(state, ref) do
       {:ok, %{port: port}} ->
         {:os_pid, os_pid} = Port.info(port, :os_pid)
         {:reply, os_pid, state}
@@ -212,12 +212,12 @@ defmodule CommandRunner do
     end
   end
 
-  def handle_call({:stop_command, command_ref}, _from, state) do
-    case State.fetch_entry_by_ref(state, command_ref) do
+  def handle_call({:stop_command, ref}, _from, state) do
+    case State.fetch_entry_by_ref(state, ref) do
       {:ok, %{client: client, port: port}} ->
         ProcessUtils.kill_os_process(port)
         GenServer.reply(client, :stopped)
-        {:reply, :ok, State.delete_entry(state, command_ref, port)}
+        {:reply, :ok, State.delete_entry(state, ref, port)}
 
       :error ->
         {:reply, :ok, state}
@@ -241,7 +241,7 @@ defmodule CommandRunner do
     case State.fetch_entry_by_port(state, port) do
       {:ok, %{result: {acc, fun}}} ->
         new_acc = fun.(acc, {:cont, data})
-        {:noreply, put_in(state, [:ports, port, :result], {new_acc, fun})}
+        {:noreply, State.put_result(state, port, {new_acc, fun})}
 
       :error ->
         {:noreply, state}
@@ -250,9 +250,9 @@ defmodule CommandRunner do
 
   def handle_info({port, {:exit_status, exit_status}}, state) do
     case State.fetch_entry_by_port(state, port) do
-      {:ok, %{client: client, command_ref: command_ref, result: {acc, fun}}} ->
+      {:ok, %{client: client, ref: ref, result: {acc, fun}}} ->
         GenServer.reply(client, {exit_status, fun.(acc, :done)})
-        {:noreply, State.delete_entry(state, command_ref, port)}
+        {:noreply, State.delete_entry(state, ref, port)}
 
       :error ->
         {:noreply, state}

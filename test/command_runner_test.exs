@@ -202,7 +202,7 @@ defmodule CommandRunnerTest do
         end)
 
       assert Task.await(task_a) == {0, ""}
-      assert Task.await(task_b) == :locked
+      assert Task.await(task_b) == :running
     end
   end
 
