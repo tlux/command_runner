@@ -26,6 +26,9 @@ defmodule CommandRunner do
 
   use GenServer
 
+  alias CommandRunner.ProcessUtils
+  alias CommandRunner.State
+
   @typedoc """
   Type describing the command runner server.
   """
@@ -49,6 +52,12 @@ defmodule CommandRunner do
 
   @doc """
   Runs a particular command and returns the exit code and result data.
+
+  ## Options
+
+  * `:cd` - Path to the working directory that the script is executed in.
+  * `:env` - A map containing environment variables that are passed to the
+    command.
 
   ## Examples
 
@@ -157,13 +166,13 @@ defmodule CommandRunner do
 
   @impl true
   def init(_init_arg) do
-    {:ok, %{commands: %{}, ports: %{}}}
+    {:ok, %State{}}
   end
 
   @impl true
   def terminate(_reason, state) do
     Enum.each(state.ports, fn {port, %{client: client}} ->
-      brutal_kill_os_process(port)
+      ProcessUtils.kill_os_process(port)
       GenServer.reply(client, :stopped)
     end)
   end
@@ -174,7 +183,7 @@ defmodule CommandRunner do
         from,
         state
       ) do
-    if Map.has_key?(state.commands, command_ref) do
+    if State.entry_exists?(state, command_ref) do
       {:reply, :locked, state}
     else
       port =
@@ -184,26 +193,16 @@ defmodule CommandRunner do
           :stderr_to_stdout | open_opts(opts)
         ])
 
-      {:noreply,
-       %{
-         commands:
-           Map.put(state.commands, command_ref, %{client: from, port: port}),
-         ports:
-           Map.put(state.ports, port, %{
-             client: from,
-             command_ref: command_ref,
-             result: Collectable.into("")
-           })
-       }}
+      {:noreply, State.put_entry(state, command_ref, port, from)}
     end
   end
 
   def handle_call({:command_running?, command_ref}, _from, state) do
-    {:reply, Map.has_key?(state.commands, command_ref), state}
+    {:reply, State.entry_exists?(state, command_ref), state}
   end
 
   def handle_call({:os_pid, command_ref}, _from, state) do
-    case Map.fetch(state.commands, command_ref) do
+    case State.fetch_entry_by_ref(state, command_ref) do
       {:ok, %{port: port}} ->
         {:os_pid, os_pid} = Port.info(port, :os_pid)
         {:reply, os_pid, state}
@@ -214,16 +213,11 @@ defmodule CommandRunner do
   end
 
   def handle_call({:stop_command, command_ref}, _from, state) do
-    case Map.fetch(state.commands, command_ref) do
+    case State.fetch_entry_by_ref(state, command_ref) do
       {:ok, %{client: client, port: port}} ->
-        brutal_kill_os_process(port)
+        ProcessUtils.kill_os_process(port)
         GenServer.reply(client, :stopped)
-
-        {:reply, :ok,
-         %{
-           commands: Map.delete(state.commands, command_ref),
-           ports: Map.delete(state.ports, port)
-         }}
+        {:reply, :ok, State.delete_entry(state, command_ref, port)}
 
       :error ->
         {:reply, :ok, state}
@@ -242,15 +236,9 @@ defmodule CommandRunner do
     end
   end
 
-  defp brutal_kill_os_process(port) do
-    with {:os_pid, os_pid} <- Port.info(port, :os_pid) do
-      System.cmd("kill", ["-9", to_string(os_pid)], stderr_to_stdout: true)
-    end
-  end
-
   @impl true
   def handle_info({port, {:data, data}}, state) do
-    case Map.fetch(state.ports, port) do
+    case State.fetch_entry_by_port(state, port) do
       {:ok, %{result: {acc, fun}}} ->
         new_acc = fun.(acc, {:cont, data})
         {:noreply, put_in(state, [:ports, port, :result], {new_acc, fun})}
@@ -261,16 +249,10 @@ defmodule CommandRunner do
   end
 
   def handle_info({port, {:exit_status, exit_status}}, state) do
-    case Map.fetch(state.ports, port) do
+    case State.fetch_entry_by_port(state, port) do
       {:ok, %{client: client, command_ref: command_ref, result: {acc, fun}}} ->
-        result = {exit_status, fun.(acc, :done)}
-        GenServer.reply(client, result)
-
-        {:noreply,
-         %{
-           commands: Map.delete(state.commands, command_ref),
-           ports: Map.delete(state.ports, port)
-         }}
+        GenServer.reply(client, {exit_status, fun.(acc, :done)})
+        {:noreply, State.delete_entry(state, command_ref, port)}
 
       :error ->
         {:noreply, state}

@@ -113,7 +113,7 @@ defmodule CommandRunnerTest do
       assert eventually(fn ->
                server
                |> :sys.get_state()
-               |> Map.fetch!(:commands)
+               |> Map.fetch!(:refs)
                |> Map.keys()
                |> List.first()
                |> is_reference()
