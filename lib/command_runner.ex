@@ -4,8 +4,8 @@ defmodule CommandRunner do
 
   ## Setup
 
-  The recommended way is to use `CommandRunner` as part of your supervision
-  tree.
+  The recommended way is to use `CommandRunner` as part of your application
+  supervision tree.
 
       defmodule MyApp.Application do
         use Application
