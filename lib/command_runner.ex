@@ -22,6 +22,30 @@ defmodule CommandRunner do
           )
         end
       end
+
+  Alternatively, you can define your own command runner.
+
+      defmodule MyApp.CommandRunner do
+        use CommandRunner
+      end
+
+  You can also mount that in your supervision tree.
+
+      defmodule MyApp.Application do
+        use Application
+
+        def start(_type, _args) do
+          children = [
+            MyApp.CommandRunner
+          ]
+
+          Supervisor.start_link(
+            children,
+            strategy: :one_for_one,
+            name: MyApp.Supervisor
+          )
+        end
+      end
   """
 
   use GenServer
