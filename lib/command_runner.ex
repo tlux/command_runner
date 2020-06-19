@@ -34,6 +34,58 @@ defmodule CommandRunner do
   """
   @type server :: GenServer.server()
 
+  defmacro __using__(_opts) do
+    quote location: :keep do
+      unless Module.has_attribute?(__MODULE__, :doc) do
+        @doc """
+        A server to run Unix shell commands.
+        """
+      end
+
+      @doc false
+      @spec child_spec(Keyword.t()) :: Supervisor.child_spec()
+      def child_spec(_spec_opts) do
+        %{
+          id: __MODULE__,
+          start: {CommandRunner, :start_link, [[name: __MODULE__]]}
+        }
+      end
+
+      defoverridable child_spec: 1
+
+      @spec start_link() :: GenServer.on_start()
+      def start_link do
+        CommandRunner.start_link(name: __MODULE__)
+      end
+
+      @spec stop(term) :: :ok
+      def stop(reason \\ :normal) do
+        CommandRunner.stop(__MODULE__, reason)
+      end
+
+      @spec run_command(binary, Keyword.t(), reference) ::
+              {exit_code :: integer, binary} | :running | :stopped
+      def run_command(cmd, opts \\ [], ref \\ make_ref()) do
+        CommandRunner.run_command(__MODULE__, cmd, opts, ref)
+      end
+
+      @spec command_running?(reference) :: boolean
+      def command_running?(ref) do
+        CommandRunner.command_running?(__MODULE__, ref)
+      end
+
+      @spec os_pid(reference) :: nil | non_neg_integer
+      def os_pid(ref) do
+        CommandRunner.os_pid(__MODULE__, ref)
+      end
+
+      @spec stop_command(reference) :: :ok
+      def stop_command(ref) do
+        CommandRunner.stop_command(__MODULE__, ref)
+      end
+    end
+  end
+
   @doc """
   Starts a command runner.
   """
