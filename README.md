@@ -14,7 +14,7 @@ by adding `command_runner` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:command_runner, "~> 0.1"}
+    {:command_runner, "~> 0.2"}
   ]
 end
 ```
